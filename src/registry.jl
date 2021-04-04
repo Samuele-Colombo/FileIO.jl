@@ -100,7 +100,7 @@ add_format(format"PPMBinary", "P6", ".ppm", [idImageIO], [idNetpbm])
 add_format(format"PBMText",   "P1", ".pbm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
 add_format(format"PGMText",   "P2", ".pgm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
 add_format(format"PPMText",   "P3", ".ppm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
-add_format(format"PFM",       "PF", ".pfm", [idImagePFM])
+add_format(format"PFM",     "PF\n", ".pfm", [idImagePFM])
 
 add_format(format"NRRD", "NRRD", [".nrrd", ".nhdr"], [:NRRD => UUID("9bb6cfbd-7763-5393-b1b5-1c8e09872146")])
 
