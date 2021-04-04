@@ -4,6 +4,7 @@
 const idCSVFiles = :CSVFiles => UUID("5d742f6a-9f54-50ce-8119-2520741973ca")
 const idImageIO = :ImageIO => UUID("82e4d734-157c-48bb-816b-45c225c6df19")
 const idImageMagick = :ImageMagick => UUID("6218d12a-5da1-5696-b52f-db25d2ecc6d1")
+const idImagePFM = :ImagePFM => UUID("de255290-5529-4d77-9c46-251ebffccf2e")
 const idMeshIO = :MeshIO => UUID("7269a6da-0436-5bbc-96c2-40638cbb6118")
 const idNetpbm = :Netpbm => UUID("f09324ee-3d7c-5217-9330-fc30815ba969")
 const idQuartzImageIO = :QuartzImageIO => UUID("dca85d43-d64c-5e67-8c65-017450d5d020")
@@ -99,6 +100,7 @@ add_format(format"PPMBinary", "P6", ".ppm", [idImageIO], [idNetpbm])
 add_format(format"PBMText",   "P1", ".pbm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
 add_format(format"PGMText",   "P2", ".pgm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
 add_format(format"PPMText",   "P3", ".ppm", [idImageIO], [idNetpbm], [idImageMagick, LOAD])
+add_format(format"PFM",       "PF", ".pfm", [idImagePFM])
 
 add_format(format"NRRD", "NRRD", [".nrrd", ".nhdr"], [:NRRD => UUID("9bb6cfbd-7763-5393-b1b5-1c8e09872146")])
 
