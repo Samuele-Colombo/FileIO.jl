@@ -1,6 +1,7 @@
 ### "Package registry"
 # Useful for packages that get used more than once below
 # Please alphabetize
+const idAVSfldIO = :AVSfldIO => UUID("b6189060-daf9-4c28-845a-cc0984b81781")
 const idCSVFiles = :CSVFiles => UUID("5d742f6a-9f54-50ce-8119-2520741973ca")
 const idImageIO = :ImageIO => UUID("82e4d734-157c-48bb-816b-45c225c6df19")
 const idImageMagick = :ImageMagick => UUID("6218d12a-5da1-5696-b52f-db25d2ecc6d1")
@@ -10,7 +11,9 @@ const idNetpbm = :Netpbm => UUID("f09324ee-3d7c-5217-9330-fc30815ba969")
 const idQuartzImageIO = :QuartzImageIO => UUID("dca85d43-d64c-5e67-8c65-017450d5d020")
 const idRData = :RData => UUID("df47a6cb-8c03-5eed-afd8-b6050d6c41da")
 const idStatFiles = :StatFiles => UUID("1463e38c-9381-5320-bcd4-4134955f093a")
+const idSixel = :Sixel => UUID("45858cf5-a6b0-47a3-bbea-62219f50df47")
 const idVegaLite = :VegaLite => UUID("112f6efa-9a02-5b7d-90c0-432ed331239a")
+const idVideoIO = :VideoIO => UUID("d6d074c3-1acf-5d4c-9a43-ef38773959a2")
 
 ### Simple cases
 
@@ -81,6 +84,7 @@ end
 
 add_format(format"RDataSingle", detect_rdata_single, [".rds"], [idRData, LOAD])
 
+add_format(format"AVSfld", "# AVS", [".fld"], [idAVSfldIO])
 add_format(format"CSV", (), [".csv"], [idCSVFiles])
 add_format(format"TSV", (), [".tsv"], [idCSVFiles])
 add_format(format"Feather", "FEA1", [".feather"], [:FeatherFiles => UUID("b675d258-116a-5741-b937-b79f054b0542")])
@@ -175,6 +179,47 @@ add_format(
     ".svg",
     [MimeWriter, SAVE]
 )
+add_format(
+    format"SIXEL",
+    UInt8[0x1b, 0x50, 0x71],
+    [".sixel", ".six"],
+    [idSixel],
+    # [idImageIO], # https://github.com/JuliaIO/ImageIO.jl/pull/31
+    [idImageMagick]
+)
+
+# Video formats
+
+# AVI is a subtype of RIFF, as is WAV
+function detectavi(io)
+    getlength(io) >= 12 || return false
+    magic = read!(io, Vector{UInt8}(undef, 4))
+    magic == b"RIFF" || return false
+    seek(io, 8)
+    submagic = read!(io, Vector{UInt8}(undef, 4))
+
+    submagic == b"AVI "
+end
+add_format(format"AVI", detectavi, ".avi", [idImageMagick], [idVideoIO])
+
+""" detectisom(io)
+
+Detect ISO/IEC 14496-12 ISO/IEC base media format files. These files start with
+a 32-bit big-endian length, and then the string 'ftyp' which is followed by
+details of the container and codec. Finding 'ftyp' is enough to know to dispatch
+to VideoIO.
+"""
+function detectisom(io)
+    getlength(io) >= 8 || return false
+    # skip the length bytes
+    seek(io, 4)
+    # and check for the magic
+    magic = read!(io, Vector{UInt8}(undef, 4))
+    magic == b"ftyp"
+end
+add_format(format"MP4", detectisom, ".mp4", [idVideoIO])
+add_format(format"OGG", UInt8[0x4F,0x67,0x67,0x53], [".ogg",".ogv"], [idVideoIO])
+add_format(format"MATROSKA", UInt8[0x1A,0x45,0xDF,0xA3], [".mkv",".mks",".webm"], [idVideoIO])
 
 #=
 add_format(format"NPY", UInt8[0x93, 'N', 'U', 'M', 'P', 'Y'], ".npy")
@@ -210,8 +255,8 @@ function detectwav(io)
     read!(io, buf)
     buf == b"WAVE"
 end
-add_format(format"WAV", detectwav, ".wav", [:WAV => UUID("8149f6b0-98f6-5db9-b78f-408fbbb8ef88")])
-add_format(format"FLAC","fLaC",".flac",[:FLAC => UUID("abae9e3b-a9a0-4778-b5c6-ca109b507d99")])
+add_format(format"WAV", detectwav, ".wav", [:WAV => UUID("8149f6b0-98f6-5db9-b78f-408fbbb8ef88")], [:LibSndFile => UUID("b13ce0c6-77b0-50c6-a2db-140568b8d1a5") ])
+add_format(format"FLAC", "fLaC", ".flac", [:FLAC => UUID("abae9e3b-a9a0-4778-b5c6-ca109b507d99")], [:LibSndFile => UUID("b13ce0c6-77b0-50c6-a2db-140568b8d1a5")])
 
 ## Profile data
 add_format(format"JLPROF", [0x4a, 0x4c, 0x50, 0x52, 0x4f, 0x46, 0x01, 0x00], ".jlprof", [:FlameGraphs => UUID("08572546-2f56-4bcf-ba4e-bab62c3a3f89")])  # magic is "JLPROF" followed by [0x01, 0x00]
@@ -309,7 +354,7 @@ function detecttiff(io)
 end
 # normal TIFF
 detect_noometiff(io) = detecttiff(io) && ((:name ∉ propertynames(io)) || !(endswith(io.name, ".ome.tif>") || endswith(io.name, ".ome.tiff>")))
-add_format(format"TIFF", detect_noometiff, [".tiff", ".tif"], [idQuartzImageIO, OSX], [idImageMagick])
+add_format(format"TIFF", detect_noometiff, [".tiff", ".tif"], [idImageIO], [idQuartzImageIO, OSX], [idImageMagick])
 # OME-TIFF
 detect_ometiff(io) = detecttiff(io) && (:name ∈ propertynames(io)) && (endswith(io.name, ".ome.tif>") || endswith(io.name, ".ome.tiff>"))
 add_format(format"OMETIFF", detect_ometiff, [".tif", ".tiff"], [:OMETIFF => UUID("2d0ec36b-e807-5756-994b-45af29551fcf")])
@@ -317,18 +362,6 @@ add_format(format"OMETIFF", detect_ometiff, [".tif", ".tiff"], [:OMETIFF => UUID
 # custom skipmagic functions for function-based tiff magic detection
 skipmagic(io, ::typeof(detect_ometiff)) = seek(io, 4)
 skipmagic(io, ::typeof(detect_noometiff)) = seek(io, 4)
-
-# AVI is a subtype of RIFF, as is WAV
-function detectavi(io)
-    getlength(io) >= 12 || return false
-    magic = read!(io, Vector{UInt8}(undef, 4))
-    magic == b"RIFF" || return false
-    seek(io, 8)
-    submagic = read!(io, Vector{UInt8}(undef, 4))
-
-    submagic == b"AVI "
-end
-add_format(format"AVI", detectavi, ".avi", [idImageMagick])
 
 # HDF5: the complication is that the magic bytes may start at
 # 0, 512, 1024, 2048, or any multiple of 2 thereafter
@@ -415,3 +448,5 @@ add_format(format"vega", (), [".vega"], [:Vega => UUID("239c3e63-733f-47ad-beb7-
 add_format(format"FCS", "FCS", [".fcs"], [:FCSFiles => UUID("d76558cf-badf-52d4-a17e-381ab0b0d937")])
 
 add_format(format"HTML", (), [".html", ".htm"], [MimeWriter, SAVE])
+
+add_format(format"MIDI", "MThd", [".mid", ".midi", ".MID"], [:MIDI => UUID("f57c4921-e30c-5f49-b073-3f2f2ada663e")])

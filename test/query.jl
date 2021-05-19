@@ -395,10 +395,30 @@ let file_dir = joinpath(@__DIR__, "files"), file_path = Path(file_dir)
             q = query(joinpath(file_dir, "bees.avi"))
             @test typeof(q) <: File{format"AVI"}
         end
+        @testset "MP4 detection" begin
+            f = download("https://archive.org/download/LadybirdOpeningWingsCCBYNatureClip/Ladybird%20opening%20wings%20CC-BY%20NatureClip.mp4")
+            q = query(f)
+            @test typeof(q) <: File{format"MP4"}
+        end
+        @testset "OGG detection" begin
+            f = download("https://upload.wikimedia.org/wikipedia/commons/8/87/Annie_Oakley_shooting_glass_balls%2C_1894.ogv")
+            q = query(f)
+            @test typeof(q) <: File{format"OGG"}
+        end
+        @testset "MATROSKA detection" begin
+            f = download("https://upload.wikimedia.org/wikipedia/commons/1/13/Artist%E2%80%99s_impression_of_the_black_hole_inside_NGC_300_X-1_%28ESO_1004c%29.webm")
+            q = query(f)
+            @test typeof(q) <: File{format"MATROSKA"}
+        end
         @testset "WAV detection" begin
             open(joinpath(file_dir, "sin.wav")) do s
                 @test FileIO.detectwav(s)
             end
+        end
+        @testset "CSV detection" begin
+            f = joinpath("files", "data.csv")
+            q = query(f)
+            @test typeof(q) <: File{format"CSV"}
         end
         @testset "RDA detection" begin
             q = query(joinpath(file_dir, "minimal_ascii.rda"))
@@ -422,6 +442,35 @@ let file_dir = joinpath(@__DIR__, "files"), file_path = Path(file_dir)
                 # need to seek to beginning of file where data structure starts
                 @test position(io)  == 0
             end
+        end
+        @testset "MIDI detection" begin
+            q = query(joinpath(file_dir, "doxy.mid"))
+            @test typeof(q) <: File{format"MIDI"}
+            q = query(joinpath(file_dir, "doxy.midi"))
+            @test typeof(q) <: File{format"MIDI"}
+            q = query(joinpath(file_dir, "doxy2.MID"))
+            @test typeof(q) <: File{format"MIDI"}
+            @test magic(format"MIDI") == b"MThd"
+            open(q) do io
+                @test position(io) == 0
+                skipmagic(io)
+                @test position(io) == 4
+            end
+        end
+        @testset "Sixel detection" begin
+            q = query(joinpath(file_dir, "rand.six"))
+            @test typeof(q) <: File{format"SIXEL"}
+            q = query(joinpath(file_dir, "rand.sixel"))
+            @test typeof(q) <: File{format"SIXEL"}
+            open(q) do io
+                @test position(io) == 0
+                skipmagic(io)
+                @test position(io) == 3
+            end
+        end
+        @testset "AVSfld detection" begin
+            q = query(joinpath(file_dir, "avs-ascii.fld"))
+            @test typeof(q) <: File{format"AVSfld"}
         end
     end
 
