@@ -472,6 +472,29 @@ let file_dir = joinpath(@__DIR__, "files"), file_path = Path(file_dir)
             q = query(joinpath(file_dir, "avs-ascii.fld"))
             @test typeof(q) <: File{format"AVSfld"}
         end
+
+        @testset "MuData detection" begin
+            q = query(joinpath(file_dir, "file1.h5mu"))
+            @test typeof(q) <: File{format"h5mu"}
+            q = query(joinpath(file_dir, "h5mu.test"))
+            @test typeof(q) <: File{format"h5mu"}
+        end
+
+        @testset "AnnData detection" begin
+            q = query(joinpath(file_dir, "file1.h5ad"))
+            @test typeof(q) <: File{format"h5ad"}
+            q = query(joinpath(file_dir, "file2.h5ad"))
+            @test typeof(q) <: File{format"h5ad"}
+            q = query(joinpath(file_dir, "h5ad.h5"))
+            @test typeof(q) <: File{format"HDF5"}
+        end
+
+        @testset "HDF5 detection" begin
+            q = query(joinpath(file_dir, "file1.h5"))
+            @test typeof(q) <: File{format"HDF5"}
+            q = query(joinpath(file_dir, "file2.h5"))
+            @test typeof(q) <: File{format"HDF5"}
+        end
     end
 
     @testset "Query from IOBuffer" begin
@@ -483,5 +506,34 @@ let file_dir = joinpath(@__DIR__, "files"), file_path = Path(file_dir)
                 @test streamformat(query(buf)) == DataFormat{:TIFF}
             end
         end
+    end
+
+    @testset "issue #338" begin
+        open("test.png", "w") do io
+            write(io, UInt8('R'))
+        end
+        q = query("test.png")
+        @test FileIO.formatname(q) == :PNG
+        q = query("test.png"; checkfile=false)
+        @test FileIO.formatname(q) == :PNG
+        rm("test.png")
+    end
+
+    @testset "issue #345" begin
+        iris = joinpath("files", "iris.rda")
+
+        q = query(iris)
+        @test typeof(q) <: File{format"RData"}
+
+        io = open(iris)
+        q = query(io)
+        @test typeof(q) <: Stream{format"GZIP"} # FIXME: should be RData
+        @test FileIO.detect_rdata(io)
+        
+        # issue #345: it errors here
+        io = CodecZlib.GzipDecompressorStream(open(iris))
+        q = query(io)
+        @test FileIO.unknown(q) # FIXME: should be RData
+        @test FileIO.detect_rdata(io)
     end
 end

@@ -14,6 +14,7 @@ const idStatFiles = :StatFiles => UUID("1463e38c-9381-5320-bcd4-4134955f093a")
 const idSixel = :Sixel => UUID("45858cf5-a6b0-47a3-bbea-62219f50df47")
 const idVegaLite = :VegaLite => UUID("112f6efa-9a02-5b7d-90c0-432ed331239a")
 const idVideoIO = :VideoIO => UUID("d6d074c3-1acf-5d4c-9a43-ef38773959a2")
+const idLibSndFile = :LibSndFile => UUID("b13ce0c6-77b0-50c6-a2db-140568b8d1a5") 
 
 ### Simple cases
 
@@ -59,13 +60,24 @@ detect_compressed(io, len=getlength(io); kwargs...) = detect_compressor(io, len;
 # test for RD?n magic sequence at the beginning of R data input stream
 function detect_rdata(io)
     seekstart(io)
-    b = read(io, UInt8)
-    if b == UInt8('R')
-        return read(io, UInt8) == UInt8('D') &&
-               read(io, UInt8) in (UInt8('A'), UInt8('B'), UInt8('X')) &&
-               read(io, UInt8) in (UInt8('2'), UInt8('3')) &&
-               (c = read(io, UInt8); c == UInt8('\n') || (c == UInt8('\r') && read(io, UInt8) == UInt8('\n')))
+    function checked_match(io)
+        for m in (
+                (UInt8('R'), ),
+                (UInt8('D'), ),
+                (UInt8('A'), UInt8('B'), UInt8('X')),
+                (UInt8('2'), UInt8('3')))
+            eof(io) && return false
+            read(io, UInt8) in m || return false
+        end
+        c = read(io, UInt8)
+        if c == UInt8('\r')
+            eof(io) && return false
+            c = read(io, UInt8)
+        end
+        c == UInt8('\n') || return false
+        return true
     end
+    checked_match(io) && return true
     return detect_compressed(io; formats=["GZIP", "BZIP2", "XZ"])
 end
 
@@ -73,8 +85,19 @@ add_format(format"RData", detect_rdata, [".rda", ".RData", ".rdata"], [idRData, 
 
 function detect_rdata_single(io)
     seekstart(io)
-    res = read(io, UInt8) in (UInt8('A'), UInt8('B'), UInt8('X')) &&
-        (c = read(io, UInt8); c == UInt8('\n') || (c == UInt8('\r') && read(io, UInt8) == UInt8('\n')))
+    function checked_match(io)
+        eof(io) && return false
+        read(io, UInt8) in (UInt8('A'), UInt8('B'), UInt8('X')) || return false
+        c = read(io, UInt8)
+        if c == UInt8('\r')
+            eof(io) && return false
+            c = read(io, UInt8)
+        end
+        c == UInt8('\n') || return false
+        return true
+    end
+    
+    res = checked_match(io)
     if !res
         res = detect_compressed(io; formats=["GZIP", "BZIP2", "XZ"])
     end
@@ -218,7 +241,7 @@ function detectisom(io)
     magic == b"ftyp"
 end
 add_format(format"MP4", detectisom, ".mp4", [idVideoIO])
-add_format(format"OGG", UInt8[0x4F,0x67,0x67,0x53], [".ogg",".ogv"], [idVideoIO])
+add_format(format"OGG", UInt8[0x4F,0x67,0x67,0x53], [".ogg",".ogv"], [idVideoIO], [idLibSndFile])
 add_format(format"MATROSKA", UInt8[0x1A,0x45,0xDF,0xA3], [".mkv",".mks",".webm"], [idVideoIO])
 
 #=
@@ -255,8 +278,8 @@ function detectwav(io)
     read!(io, buf)
     buf == b"WAVE"
 end
-add_format(format"WAV", detectwav, ".wav", [:WAV => UUID("8149f6b0-98f6-5db9-b78f-408fbbb8ef88")], [:LibSndFile => UUID("b13ce0c6-77b0-50c6-a2db-140568b8d1a5") ])
-add_format(format"FLAC", "fLaC", ".flac", [:FLAC => UUID("abae9e3b-a9a0-4778-b5c6-ca109b507d99")], [:LibSndFile => UUID("b13ce0c6-77b0-50c6-a2db-140568b8d1a5")])
+add_format(format"WAV", detectwav, ".wav", [:WAV => UUID("8149f6b0-98f6-5db9-b78f-408fbbb8ef88")], [idLibSndFile])
+add_format(format"FLAC", "fLaC", ".flac", [:FLAC => UUID("abae9e3b-a9a0-4778-b5c6-ca109b507d99")], [idLibSndFile])
 
 ## Profile data
 add_format(format"JLPROF", [0x4a, 0x4c, 0x50, 0x52, 0x4f, 0x46, 0x01, 0x00], ".jlprof", [:FlameGraphs => UUID("08572546-2f56-4bcf-ba4e-bab62c3a3f89")])  # magic is "JLPROF" followed by [0x01, 0x00]
@@ -383,7 +406,24 @@ function detecthdf5(io)
     end
     false
 end
+
+const MUDATA_MAGIC = UInt8['M', 'u', 'D', 'a', 't', 'a']
+function detect_mudata(io)
+    seekstart(io)
+    if read(io, 6) != MUDATA_MAGIC
+        return false
+    end
+    seekstart(io)
+    return detecthdf5(io)
+end
+
+# h5mu has to be before HDF5 to give it higher priority, since h5mu files are also valid HDF5 files
+add_format(format"h5mu", detect_mudata, [".h5mu"], [:Muon => UUID("446846d7-b4ce-489d-bf74-72da18fe3629")])
+
 add_format(format"HDF5", detecthdf5, [".h5", ".hdf5"], [:HDF5 => UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f")])
+
+# h5ad has to be after HDF5 to give it less priority
+add_format(format"h5ad", detecthdf5, [".h5ad"], [:Muon => UUID("446846d7-b4ce-489d-bf74-72da18fe3629")])
 
 function detect_stlascii(io)
     pos = position(io)
