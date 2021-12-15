@@ -8,7 +8,7 @@ struct LoaderError <: Exception
     msg::String
     ex
 end
-Base.showerror(io::IO, e::LoaderError) = println(io, e.library, " load error: ",
+Base.showerror(io::IO, e::LoaderError) = println(IOContext(io, :limit=>true), e.library, " load error: ",
                                                  e.msg, "\n  due to ", e.ex, "\n  Will try next loader.")
 
 """
@@ -22,7 +22,7 @@ struct WriterError <: Exception
     ex
 end
 Base.showerror(io::IO, e::WriterError) = println(
-    io, e.library, " writer error: ",
+    IOContext(io, :limit=>true), e.library, " writer error: ",
     e.msg, "\n  due to ", e.ex, "\n  Will try next loader."
 )
 
@@ -58,4 +58,17 @@ function handle_exceptions(exceptions::Vector, action)
     end
 end
 
-handle_error(e, q, bt) = throw(CapturedException(e, stacktrace(bt)))
+handle_error(e, q, bt) = throw(CapturedException(e, trim!(stacktrace(bt))))
+
+function trim!(sfs)
+    i = firstindex(sfs)
+    while i <= lastindex(sfs)
+        sf = sfs[i]
+        if Base.StackTraces.is_top_level_frame(sf)
+            deleteat!(sfs, i+1:lastindex(sfs))
+            break
+        end
+        i += 1
+    end
+    return sfs
+end

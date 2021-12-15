@@ -140,6 +140,7 @@ add_format(format"CUR", UInt8[0x00,0x00,0x02,0x00],                     ".cur", 
 add_format(format"DCX", UInt8[0xb1,0x68,0xde,0x3a],                     ".dcx", [idImageMagick])
 add_format(format"DOT", UInt8[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1], ".dot", [idImageMagick])
 add_format(format"EPS", UInt8[0x25,0x21,0x50,0x53,0x2d,0x41,0x64,0x6f], ".eps", [idImageMagick], [MimeWriter, SAVE])
+add_format(format"EXR", UInt8[0x76,0x2f,0x31,0x01],                     ".exr", [idImageIO])
 add_format(format"HDR", UInt8[0x23,0x3f,0x52,0x41,0x44,0x49,0x41,0x4e], ".hdr", [idImageMagick])
 add_format(format"ICO", UInt8[0x00,0x00,0x01,0x00],                     ".ico", [idImageMagick])
 add_format(format"INFO", UInt8[0x7a,0x62,0x65,0x78],                    ".info",[idImageMagick])
@@ -474,7 +475,7 @@ function detect_gadget2(io)
     seek(io, sizeof(Int32)+256)
     temp2 = read(io, Int32)
     seek(io, pos)
-    return temp1 == temp2
+    return temp1 == temp2 == 256
 end
 add_format(format"Gadget2", detect_gadget2, [".gadget2", ".Gadget2", ".GADGET2"], [:AstroIO => UUID("c85a633c-0c3f-44a2-bffe-7f9d0681b3e7")])
 
